@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg-app: #f8fafc;
+  --card-bg: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-card: rgba(226, 232, 240, 0.9);
+  --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+}
+
+.dark {
+  --bg-app: #020617;
+  --card-bg: #0f172a;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border-card: rgba(30, 41, 59, 1);
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+@layer base {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Custom elevated card class for light/dark theme harmony */
+  .theme-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Custom subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.35);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.55);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(51, 65, 85, 0.5);
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(71, 85, 105, 0.7);
+  }
+}
+

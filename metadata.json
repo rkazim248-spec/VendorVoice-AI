@@ -1,0 +1,10 @@
+{
+  "name": "VendorVoice AI",
+  "description": "AI-Powered Voice Ledger, Smart Credit Manager \u0026 Business Assistant for vendors and shopkeepers",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
