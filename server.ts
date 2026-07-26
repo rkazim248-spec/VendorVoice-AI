@@ -65,14 +65,15 @@ async function startServer() {
     if (transactionType === 'expense') {
       customerName = 'Shop Expense';
     } else {
-      const commonNames = [
-        'Ali', 'Fatima', 'Priya', 'Karim', 'Ahmed', 'Rahul', 'Sana', 
-        'Usman', 'Zain', 'Tariq', 'Mohammed', 'Sara', 'Ayesha', 'Bilal', 'Omar',
-        'John', 'David', 'Alex', 'Sarah', 'Michael', 'Emma', 'James', 'Robert', 'Daniel'
-      ];
-      const matchFound = commonNames.find(n => new RegExp(`\\b${n}\\b`, 'i').test(text));
-      if (matchFound) {
-        customerName = matchFound;
+      const commonNames: Record<string, string> = {
+        'Ali': 'Ali', 'Fatima': 'Fatima', 'Priya': 'Priya', 'Karim': 'Karim', 'Ahmed': 'Ahmed',
+        'Rahul': 'Rahul', 'Sana': 'Sana', 'Usman': 'Usman', 'Zain': 'Zain', 'Tariq': 'Tariq',
+        'Mohammed': 'Mohammed', 'Sara': 'Sara', 'Ayesha': 'Ayesha', 'Bilal': 'Bilal', 'Omar': 'Omar',
+        'John': 'John', 'David': 'David', 'Alex': 'Alex', 'Sarah': 'Sarah', 'Michael': 'Michael'
+      };
+      const matchKey = Object.keys(commonNames).find(n => new RegExp(`\\b${n}\\b`, 'i').test(text));
+      if (matchKey) {
+        customerName = commonNames[matchKey];
       } else {
         const nameMatch = text.match(/(?:sold|from|to|for|with|collected|customer|ko|ne)\s+([A-Z][a-z]+)/i);
         if (nameMatch && !['Sold', 'Paid', 'Collected', 'Total', 'Item', 'Shop', 'Walk-in', 'Cash', 'Credit'].includes(nameMatch[1])) {
@@ -146,13 +147,13 @@ async function startServer() {
 
     let items: any[] = [];
     if (transactionType === 'sale') {
-      let itemName = 'General Grocery Goods';
-      if (lower.includes('rice') || lower.includes('chawal')) itemName = 'Basmati Rice';
-      else if (lower.includes('milk') || lower.includes('doodh') || lower.includes('olpers')) itemName = 'Dairy Milk & Drinks';
-      else if (lower.includes('tea') || lower.includes('chai')) itemName = 'Tea Packets';
-      else if (lower.includes('oil') || lower.includes('tail') || lower.includes('ghee')) itemName = 'Cooking Oil';
-      else if (lower.includes('aata') || lower.includes('flour')) itemName = 'Wheat Flour';
-      else if (lower.includes('chini') || lower.includes('sugar')) itemName = 'Sugar Pack';
+      let itemName = 'General Grocery Items';
+      if (lower.includes('rice') || lower.includes('chawal')) itemName = 'Rice (Chawal)';
+      else if (lower.includes('milk') || lower.includes('doodh') || lower.includes('olpers')) itemName = 'Milk (Doodh)';
+      else if (lower.includes('tea') || lower.includes('chai')) itemName = 'Tea (Chai)';
+      else if (lower.includes('oil') || lower.includes('tail') || lower.includes('ghee')) itemName = 'Cooking Oil (Ghee)';
+      else if (lower.includes('aata') || lower.includes('flour')) itemName = 'Wheat Flour (Aata)';
+      else if (lower.includes('chini') || lower.includes('sugar')) itemName = 'Sugar (Chini)';
       else if (text.length > 0 && text.length < 50) itemName = text;
 
       items = [{
@@ -173,7 +174,7 @@ async function startServer() {
       paidAmount: paidAmount || (transactionType === 'sale' ? 10 : 0),
       creditAmount,
       paymentMethod,
-      notes: text
+      notes: `${customerName} transaction - Total: ${totalAmount || 10}`
     };
   }
 
@@ -185,7 +186,7 @@ async function startServer() {
   // 2. API: Parse Voice Speech to Structured Transaction JSON
   app.post('/api/parse-transaction', async (req, res) => {
     try {
-      const { speechText, language = 'English', currency = '£' } = req.body;
+      const { speechText, language = 'Urdu', outputScript = 'roman_urdu', currency = '£' } = req.body;
       if (!speechText || typeof speechText !== 'string') {
         return res.status(400).json({ error: 'speechText is required' });
       }
@@ -193,22 +194,38 @@ async function startServer() {
       const ai = getGenAI();
       if (ai) {
         try {
+          let scriptInstruction = "";
+          if (outputScript === 'urdu') {
+            scriptInstruction = `
+Write ALL text output fields (customerName, product items names, notes) strictly in URDU SCRIPT (اردو رسم الخط) e.g., customerName: "علی", item name: "چاول", notes: "علی کو 2 چاول کے تھیلے بیچے".`;
+          } else if (outputScript === 'english') {
+            scriptInstruction = `
+Write ALL text output fields in clear ENGLISH e.g., customerName: "Ali", item name: "Basmati Rice", notes: "Sold 2 bags of Rice to Ali".`;
+          } else {
+            // Default: roman_urdu or English script
+            scriptInstruction = `
+Write ALL text output fields in ROMAN URDU / ENGLISH SCRIPT (e.g., customerName: "Ali", item name: "Rice (Chawal)", notes: "Sold 2 Rice bags to Ali. 20 Cash, 25 Credit").
+CRITICAL: Do NOT output Arabic/Urdu script. Use English letters (Roman script).`;
+          }
+
           const prompt = `
 You are VendorVoice AI, an intelligent shopkeeper bookkeeping assistant.
 Parse the following spoken transaction text into structured JSON.
-CRITICAL INSTRUCTION: The speech input is spoken in Urdu (or Pakistani Urdu / Roman Urdu / Urdu-English code mix). ALWAYS detect, transcribe, and interpret the speech as Urdu.
 
+Input speech: "${speechText}"
 Current currency symbol: ${currency}
-Spoken input: "${speechText}"
+
+OUTPUT SCRIPT INSTRUCTIONS:
+${scriptInstruction}
 
 Return ONLY a valid JSON object strictly adhering to this structure without markdown codeblocks:
 {
-  "customerName": "string or 'Walk-in Customer'",
+  "customerName": "string name (e.g. 'Ali' or 'Walk-in Customer')",
   "customerPhone": "string or empty",
   "transactionType": "sale" | "payment_received" | "expense",
   "items": [
     {
-      "name": "string product name (transliterated or in English/Urdu)",
+      "name": "product name in requested script (e.g. 'Rice (Chawal)')",
       "quantity": number,
       "unit": "kg" | "pcs" | "bottle" | "pack" | "litre" | "unit",
       "unitPrice": number,
@@ -219,7 +236,7 @@ Return ONLY a valid JSON object strictly adhering to this structure without mark
   "paidAmount": number,
   "creditAmount": number,
   "paymentMethod": "cash" | "online" | "credit" | "split" | "card",
-  "notes": "short summary explanation of transaction"
+  "notes": "transaction summary in requested script"
 }
 `;
 
@@ -258,11 +275,11 @@ Return ONLY a valid JSON object strictly adhering to this structure without mark
     const lowStock = storeSummary?.lowStockCount || 0;
 
     const defaultInsights = [
-      `Daily sales reaching ${curr}${todaySales}. High demand in dairy and grocery essentials.`,
-      `Pending customer khata balance is ${curr}${totalCredit}. Send soft WhatsApp reminders for credit collection.`,
+      `روزانہ کی فروخت ${curr}${todaySales} تک پہنچ گئی۔ ڈیری اور راشن کی طلب زیادہ ہے۔`,
+      `کل التوا میں واجب الادا قرضہ ${curr}${totalCredit} ہے۔ گاہکوں کو واٹس ایپ پر یاد دہانی بھیجیں۔`,
       lowStock > 0 
-        ? `${lowStock} items running low on stock. Consider placing supplier orders soon.`
-        : `Inventory levels are healthy across fast-moving product categories.`
+        ? `${lowStock} مصنوعات کا اسٹاک کم ہو رہا ہے۔ سپلائرز کو نیا آرڈر جاری کریں۔`
+        : `تمام اہم مصنوعات کا اسٹاک بہترین حالت میں موجود ہے۔`
     ];
 
     try {
@@ -273,7 +290,8 @@ You are VendorVoice AI Business Advisor.
 Analyze this shopkeeper summary data:
 ${JSON.stringify(storeSummary, null, 2)}
 
-Provide 3 short, actionable, friendly, plain-language insights for the vendor.
+Provide 3 short, actionable, friendly insights for the vendor.
+CRITICAL MANDATORY INSTRUCTION: Write all 3 insights strictly in URDU SCRIPT (اردو زبان).
 Return ONLY a JSON array of strings without markdown formatting.
 `;
 
@@ -300,14 +318,14 @@ Return ONLY a JSON array of strings without markdown formatting.
     const balanceNum = parseFloat(String(balance).replace(/[^0-9.]/g, '')) || 0;
 
     let defaultRisk = 'Low Risk';
-    let defaultExplanation = `${customerName} maintains a safe purchase to debt ratio. Recommended for standard credit limit.`;
+    let defaultExplanation = `${customerName} کا کھاتہ محفوظ ہے۔ مزید کریڈٹ دیا جا سکتا ہے۔`;
 
     if (balanceNum > 100) {
       defaultRisk = 'High Risk';
-      defaultExplanation = `${customerName} has a high pending debt. Recommend receiving partial payment before extending new credit.`;
+      defaultExplanation = `${customerName} پر پرانا قرض زیادہ ہے۔ نیا سامان دینے سے پہلے وصولی کریں۔`;
     } else if (balanceNum > 30) {
       defaultRisk = 'Medium Risk';
-      defaultExplanation = `${customerName} has a moderate balance. Send a friendly WhatsApp reminder.`;
+      defaultExplanation = `${customerName} کا درمیانہ بیلنس واجب الادا ہے۔ دوستانہ یاد دہانی بھیجیں۔`;
     }
 
     try {
@@ -318,10 +336,12 @@ Evaluate customer credit risk for shopkeeper khata ledger.
 Customer: ${customerName}
 Current Outstanding Debt: ${balance}
 
+CRITICAL MANDATORY INSTRUCTION: Write the "explanation" field strictly in URDU SCRIPT (اردو زبان).
+
 Return JSON object:
 {
   "risk": "Low Risk" | "Medium Risk" | "High Risk",
-  "explanation": "string"
+  "explanation": "string in Urdu script"
 }
 `;
 
@@ -352,21 +372,21 @@ Return JSON object:
     if (q.includes('owe') || q.includes('debt') || q.includes('khata') || q.includes('pending')) {
       const highest = storeContext?.customers?.sort((a: any, b: any) => b.debt - a.debt)[0];
       if (highest && highest.debt > 0) {
-        answer = `${highest.name} owes the highest balance at ${curr}${highest.debt}. You can tap 'Send WhatsApp' in the Khata tab to request payment.`;
+        answer = `${highest.name} کا سب سے زیادہ واجب الادا بیلنس ${curr}${highest.debt} ہے۔ آپ کھاطہ ٹیب سے واٹس ایپ میسج بھیج سکتے ہیں۔`;
       } else {
-        answer = "All customer khata debts are currently clear!";
+        answer = "تمام کسٹمرز کے کھاطہ جات بالکل صاف ہیں!";
       }
     } else if (q.includes('profit') || q.includes('margin') || q.includes('earned')) {
-      answer = `Based on your store records, your estimated net profit margin is 28%, yielding healthy daily returns.`;
+      answer = `آپ کے اسٹور کے مطابق، آپ کا تخمینہ شدہ خالص منافع کا تناسب 28% ہے۔`;
     } else if (q.includes('restock') || q.includes('stock') || q.includes('low')) {
       const lowStock = storeContext?.products?.filter((p: any) => p.stock <= p.minStock);
       if (lowStock && lowStock.length > 0) {
-        answer = `The following products are running low on stock:\n` + lowStock.map((p: any) => `• ${p.name}: ${p.stock} remaining`).join('\n');
+        answer = `درج ذیل مصنوعات کا اسٹاک کم ہے:\n` + lowStock.map((p: any) => `• ${p.name}: ${p.stock} باقی`).join('\n');
       } else {
-        answer = `Inventory levels look healthy. Fast-moving goods are well stocked.`;
+        answer = `تمام مصنوعات کا اسٹاک مناسب مقدار میں موجود ہے۔`;
       }
     } else {
-      answer = `Hello! I checked your store ledger. All transactions and customer balances are up to date. Let me know if you need specific reports on debt or inventory.`;
+      answer = `اسلام علیکم! میں نے آپ کا لیجر چیک کر لیا ہے۔ تمام ریکارڈز اپ ڈیٹ ہیں۔`;
     }
 
     try {
@@ -375,6 +395,8 @@ Return JSON object:
         const prompt = `
 You are VendorVoice AI, the voice assistant for a local shopkeeper.
 Answer the vendor's question using the live store context provided below.
+
+CRITICAL MANDATORY INSTRUCTION: Regardless of whether the vendor asks in ENGLISH or URDU, ALWAYS respond in clear, friendly URDU SCRIPT (اردو زبان) so the vendor reads and hears Urdu.
 
 Live Store Data Context:
 ${JSON.stringify(storeContext, null, 2)}

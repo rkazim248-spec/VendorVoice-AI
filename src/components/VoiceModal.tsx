@@ -29,6 +29,8 @@ export const VoiceModal: React.FC = () => {
     customers 
   } = useStore();
 
+  const [speechLang, setSpeechLang] = useState<'en-US' | 'ur-PK'>('en-US');
+  const [outputScript, setOutputScript] = useState<'roman_urdu' | 'urdu' | 'english'>('roman_urdu');
   const [isListening, setIsListening] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<string>('');
   const [isParsing, setIsParsing] = useState<boolean>(false);
@@ -64,7 +66,8 @@ export const VoiceModal: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           speechText: textToParse,
-          language: 'Urdu',
+          language: speechLang === 'ur-PK' ? 'Urdu' : 'English',
+          outputScript: outputScript,
           currency: profile.currency
         })
       });
@@ -72,7 +75,7 @@ export const VoiceModal: React.FC = () => {
       const data = await res.json();
       if (data.success && data.transaction) {
         const tx = data.transaction;
-        setCustomerName(tx.customerName || 'Walk-in Customer');
+        setCustomerName(tx.customerName || 'عام گاہک (Walk-in Customer)');
         setCustomerPhone(tx.customerPhone || '');
         const type: TransactionType = tx.transactionType || 'sale';
         setTxType(type);
@@ -123,8 +126,8 @@ export const VoiceModal: React.FC = () => {
       console.error('Failed to parse speech:', err);
       setParseError('AI speech parser offline or busy. You can edit fields manually below.');
       // Fallback preview
-      setCustomerName('Walk-in Customer');
-      setItems([{ name: 'General Grocery Goods', quantity: 1, unit: 'pcs', unitPrice: 10, totalPrice: 10 }]);
+      setCustomerName('عام گاہک (Walk-in Customer)');
+      setItems([{ name: 'عام کریانہ سامان', quantity: 1, unit: 'pcs', unitPrice: 10, totalPrice: 10 }]);
       setTotalAmount(10);
       setPaidAmount(10);
       setCreditAmount(0);
@@ -139,7 +142,7 @@ export const VoiceModal: React.FC = () => {
     handleParseVoiceRef.current = handleParseVoice;
   });
 
-  // Initialize Speech Recognition if supported
+  // Initialize Speech Recognition
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -147,8 +150,7 @@ export const VoiceModal: React.FC = () => {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-
-        recognition.lang = 'ur-PK'; // Always detect speech in Urdu
+        recognition.lang = speechLang;
 
         recognition.onresult = (event: any) => {
           let fullText = '';
@@ -175,7 +177,7 @@ export const VoiceModal: React.FC = () => {
         recognitionRef.current = recognition;
       }
     }
-  }, []);
+  }, [speechLang]);
 
   const startListening = () => {
     setParseError('');
@@ -184,6 +186,7 @@ export const VoiceModal: React.FC = () => {
     setIsListening(true);
     if (recognitionRef.current) {
       try {
+        recognitionRef.current.lang = speechLang;
         recognitionRef.current.start();
       } catch (e) {
         console.log('Recognition start error:', e);
@@ -225,23 +228,27 @@ export const VoiceModal: React.FC = () => {
     setPaidAmount(Math.max(0, totalAmount - newCredit));
   };
 
-  // Shortcut presets for instant testing (Urdu Speech)
+  // Shortcut presets for instant testing (English & Urdu Speech)
   const presets = [
     {
-      label: 'Ali Sale (Urdu Udhaar)',
+      label: 'English: Ali Sale (Udhaar)',
+      text: 'Sold 2 bags of rice and 1 oil bottle to Ali for 45 rupees. Paid 20 cash and 25 credit.'
+    },
+    {
+      label: 'English: Fatima Sale (Cash)',
+      text: 'Fatima bought 5 Olpers milk and 2 tea packs. Total 32 rupees cash paid.'
+    },
+    {
+      label: 'English: Debt Collection',
+      text: 'Collected 20 rupees debt repayment from Priya.'
+    },
+    {
+      label: 'English: Shop Expense',
+      text: 'Spent 15 rupees on electricity bill and bulb for the shop.'
+    },
+    {
+      label: 'Urdu: Ali Sale (Urdu Udhaar)',
       text: 'Ali ko 2 chawal ke bag aur 1 oil bottle bechi. Total 45 rupay. 20 naqad diye aur 25 udhaar.'
-    },
-    {
-      label: 'Fatima Sale (Urdu Cash)',
-      text: 'Fatima ne 5 olpers doodh aur 2 chai ke packet liye. Total 32 rupay naqad adaa kiye.'
-    },
-    {
-      label: 'Debt Repayment (Urdu Debt)',
-      text: 'Priya se purana 20 rupay ka udhaar vasool hua.'
-    },
-    {
-      label: 'Shop Expense (Urdu Expense)',
-      text: 'Dukan ke bijli ke bill aur bulb ke liye 15 rupay kharch kiye.'
     }
   ];
 
@@ -300,17 +307,84 @@ export const VoiceModal: React.FC = () => {
         </button>
 
         {/* Modal Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-4">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300 text-xs font-semibold mb-2 border border-emerald-200/60 dark:border-emerald-800/60">
             <Mic className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-            Urdu Voice AI Active
+            Urdu AI Ledger Active
           </div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Speak Your Transaction
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-            VendorVoice automatically detects and parses your speech in Urdu into structured ledger entries.
+            Choose your preferred speaking language & output script below:
           </p>
+
+          {/* Speech Controls */}
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {/* Input Language */}
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span>Speech Input:</span>
+              <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setSpeechLang('en-US')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    speechLang === 'en-US'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  🗣️ English
+                </button>
+                <button
+                  onClick={() => setSpeechLang('ur-PK')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    speechLang === 'ur-PK'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  🗣️ Urdu / اردو
+                </button>
+              </div>
+            </div>
+
+            {/* Output Script Format */}
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span>Output Script:</span>
+              <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setOutputScript('roman_urdu')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    outputScript === 'roman_urdu'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  🔤 Roman / English
+                </button>
+                <button
+                  onClick={() => setOutputScript('urdu')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    outputScript === 'urdu'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  🇵🇰 Urdu (اردو)
+                </button>
+                <button
+                  onClick={() => setOutputScript('english')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    outputScript === 'english'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  🇬🇧 Pure English
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Giant Mic Section */}
@@ -435,7 +509,7 @@ export const VoiceModal: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">
-                  Customer Name
+                  گاہک کا نام (Customer)
                 </label>
                 <div className="relative mt-1">
                   <User className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
@@ -443,6 +517,7 @@ export const VoiceModal: React.FC = () => {
                     type="text"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="نام درج کریں"
                     className="w-full pl-8 pr-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
                   />
                 </div>
@@ -450,7 +525,7 @@ export const VoiceModal: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">
-                  Transaction Type
+                  لین دین کی قسم (Type)
                 </label>
                 <select
                   value={txType}
@@ -464,9 +539,9 @@ export const VoiceModal: React.FC = () => {
                   }}
                   className="w-full mt-1 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
                 >
-                  <option value="sale">Sale (Goods Sold)</option>
-                  <option value="payment_received">Debt Payment Received</option>
-                  <option value="expense">Shop Expense</option>
+                  <option value="sale">فروخت / سیل (Sale)</option>
+                  <option value="payment_received">قرض کی وصولی (Debt Payment)</option>
+                  <option value="expense">دوکان کا خرچہ (Shop Expense)</option>
                 </select>
               </div>
             </div>
@@ -476,17 +551,17 @@ export const VoiceModal: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">
-                    Itemized Goods ({items.length})
+                    اشیاء (Urdu Items): {items.length}
                   </label>
                   <span className="text-[10px] font-bold text-slate-500">
-                    Subtotal: {profile.currency}{items.reduce((s, it) => s + (Number(it.totalPrice) || ((Number(it.quantity) || 1) * (Number(it.unitPrice) || 0))), 0)}
+                    کل: {profile.currency}{items.reduce((s, it) => s + (Number(it.totalPrice) || ((Number(it.quantity) || 1) * (Number(it.unitPrice) || 0))), 0)}
                   </span>
                 </div>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                   {items.map((it, i) => (
                     <div key={i} className="flex items-center justify-between text-xs p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                      <span className="font-medium text-slate-800 dark:text-slate-200">
-                        {it.quantity} {it.unit || 'pcs'} x {it.name}
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {it.quantity} {it.unit || 'عدد'} × {it.name}
                       </span>
                       <span className="font-bold text-slate-900 dark:text-white">
                         {profile.currency}{it.totalPrice || (it.quantity * it.unitPrice)}
@@ -496,6 +571,20 @@ export const VoiceModal: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Urdu Notes / Transaction Summary */}
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                تفصیل / نوٹس (Urdu Ledger Summary)
+              </label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="اردو میں تفصیل..."
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
             {/* Amount & Split Breakdown */}
             <div className="grid grid-cols-3 gap-2 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
