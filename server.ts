@@ -186,7 +186,7 @@ async function startServer() {
   // 2. API: Parse Voice Speech to Structured Transaction JSON
   app.post('/api/parse-transaction', async (req, res) => {
     try {
-      const { speechText, language = 'Urdu', outputScript = 'roman_urdu', currency = '£' } = req.body;
+      const { speechText, language = 'English', outputScript = 'english', currency = '£' } = req.body;
       if (!speechText || typeof speechText !== 'string') {
         return res.status(400).json({ error: 'speechText is required' });
       }
@@ -194,20 +194,6 @@ async function startServer() {
       const ai = getGenAI();
       if (ai) {
         try {
-          let scriptInstruction = "";
-          if (outputScript === 'urdu') {
-            scriptInstruction = `
-Write ALL text output fields (customerName, product items names, notes) strictly in URDU SCRIPT (اردو رسم الخط) e.g., customerName: "علی", item name: "چاول", notes: "علی کو 2 چاول کے تھیلے بیچے".`;
-          } else if (outputScript === 'english') {
-            scriptInstruction = `
-Write ALL text output fields in clear ENGLISH e.g., customerName: "Ali", item name: "Basmati Rice", notes: "Sold 2 bags of Rice to Ali".`;
-          } else {
-            // Default: roman_urdu or English script
-            scriptInstruction = `
-Write ALL text output fields in ROMAN URDU / ENGLISH SCRIPT (e.g., customerName: "Ali", item name: "Rice (Chawal)", notes: "Sold 2 Rice bags to Ali. 20 Cash, 25 Credit").
-CRITICAL: Do NOT output Arabic/Urdu script. Use English letters (Roman script).`;
-          }
-
           const prompt = `
 You are VendorVoice AI, an intelligent shopkeeper bookkeeping assistant.
 Parse the following spoken transaction text into structured JSON.
@@ -215,8 +201,8 @@ Parse the following spoken transaction text into structured JSON.
 Input speech: "${speechText}"
 Current currency symbol: ${currency}
 
-OUTPUT SCRIPT INSTRUCTIONS:
-${scriptInstruction}
+CRITICAL MANDATORY INSTRUCTION:
+Write ALL text output fields (customerName, product item names, notes, and summaries) strictly in clear, clean ENGLISH script (e.g. customerName: "Ali", item name: "Basmati Rice", notes: "Sold 2 bags of Rice to Ali").
 
 Return ONLY a valid JSON object strictly adhering to this structure without markdown codeblocks:
 {
@@ -225,7 +211,7 @@ Return ONLY a valid JSON object strictly adhering to this structure without mark
   "transactionType": "sale" | "payment_received" | "expense",
   "items": [
     {
-      "name": "product name in requested script (e.g. 'Rice (Chawal)')",
+      "name": "product name in English (e.g. 'Rice')",
       "quantity": number,
       "unit": "kg" | "pcs" | "bottle" | "pack" | "litre" | "unit",
       "unitPrice": number,
@@ -236,7 +222,7 @@ Return ONLY a valid JSON object strictly adhering to this structure without mark
   "paidAmount": number,
   "creditAmount": number,
   "paymentMethod": "cash" | "online" | "credit" | "split" | "card",
-  "notes": "transaction summary in requested script"
+  "notes": "transaction summary in clear English"
 }
 `;
 
@@ -275,11 +261,11 @@ Return ONLY a valid JSON object strictly adhering to this structure without mark
     const lowStock = storeSummary?.lowStockCount || 0;
 
     const defaultInsights = [
-      `روزانہ کی فروخت ${curr}${todaySales} تک پہنچ گئی۔ ڈیری اور راشن کی طلب زیادہ ہے۔`,
-      `کل التوا میں واجب الادا قرضہ ${curr}${totalCredit} ہے۔ گاہکوں کو واٹس ایپ پر یاد دہانی بھیجیں۔`,
+      `Daily sales reaching ${curr}${todaySales}. Strong demand across grocery essentials.`,
+      `Pending customer credit balance is ${curr}${totalCredit}. Send friendly payment reminders on WhatsApp.`,
       lowStock > 0 
-        ? `${lowStock} مصنوعات کا اسٹاک کم ہو رہا ہے۔ سپلائرز کو نیا آرڈر جاری کریں۔`
-        : `تمام اہم مصنوعات کا اسٹاک بہترین حالت میں موجود ہے۔`
+        ? `${lowStock} products are running low on stock. Consider placing supplier reorders.`
+        : `Inventory levels are healthy across all primary categories.`
     ];
 
     try {
@@ -291,7 +277,7 @@ Analyze this shopkeeper summary data:
 ${JSON.stringify(storeSummary, null, 2)}
 
 Provide 3 short, actionable, friendly insights for the vendor.
-CRITICAL MANDATORY INSTRUCTION: Write all 3 insights strictly in URDU SCRIPT (اردو زبان).
+CRITICAL MANDATORY INSTRUCTION: Write all 3 insights strictly in clear ENGLISH.
 Return ONLY a JSON array of strings without markdown formatting.
 `;
 
@@ -318,14 +304,14 @@ Return ONLY a JSON array of strings without markdown formatting.
     const balanceNum = parseFloat(String(balance).replace(/[^0-9.]/g, '')) || 0;
 
     let defaultRisk = 'Low Risk';
-    let defaultExplanation = `${customerName} کا کھاتہ محفوظ ہے۔ مزید کریڈٹ دیا جا سکتا ہے۔`;
+    let defaultExplanation = `${customerName} maintains a safe payment balance. Additional credit can be extended.`;
 
     if (balanceNum > 100) {
       defaultRisk = 'High Risk';
-      defaultExplanation = `${customerName} پر پرانا قرض زیادہ ہے۔ نیا سامان دینے سے پہلے وصولی کریں۔`;
+      defaultExplanation = `${customerName} has a high pending balance. Recommend requesting partial payment before extending new credit.`;
     } else if (balanceNum > 30) {
       defaultRisk = 'Medium Risk';
-      defaultExplanation = `${customerName} کا درمیانہ بیلنس واجب الادا ہے۔ دوستانہ یاد دہانی بھیجیں۔`;
+      defaultExplanation = `${customerName} has a moderate balance due. Send a friendly payment reminder.`;
     }
 
     try {
@@ -336,12 +322,12 @@ Evaluate customer credit risk for shopkeeper khata ledger.
 Customer: ${customerName}
 Current Outstanding Debt: ${balance}
 
-CRITICAL MANDATORY INSTRUCTION: Write the "explanation" field strictly in URDU SCRIPT (اردو زبان).
+CRITICAL MANDATORY INSTRUCTION: Write the "explanation" field strictly in clear ENGLISH.
 
 Return JSON object:
 {
   "risk": "Low Risk" | "Medium Risk" | "High Risk",
-  "explanation": "string in Urdu script"
+  "explanation": "string in English"
 }
 `;
 
@@ -372,21 +358,21 @@ Return JSON object:
     if (q.includes('owe') || q.includes('debt') || q.includes('khata') || q.includes('pending')) {
       const highest = storeContext?.customers?.sort((a: any, b: any) => b.debt - a.debt)[0];
       if (highest && highest.debt > 0) {
-        answer = `${highest.name} کا سب سے زیادہ واجب الادا بیلنس ${curr}${highest.debt} ہے۔ آپ کھاطہ ٹیب سے واٹس ایپ میسج بھیج سکتے ہیں۔`;
+        answer = `${highest.name} owes the highest outstanding balance of ${curr}${highest.debt}. You can tap 'Send WhatsApp' in the Customers tab to send a reminder.`;
       } else {
-        answer = "تمام کسٹمرز کے کھاطہ جات بالکل صاف ہیں!";
+        answer = "All customer khata debts are currently clear!";
       }
     } else if (q.includes('profit') || q.includes('margin') || q.includes('earned')) {
-      answer = `آپ کے اسٹور کے مطابق، آپ کا تخمینہ شدہ خالص منافع کا تناسب 28% ہے۔`;
+      answer = `Based on your store records, your estimated net profit margin is 28%, generating healthy daily returns.`;
     } else if (q.includes('restock') || q.includes('stock') || q.includes('low')) {
       const lowStock = storeContext?.products?.filter((p: any) => p.stock <= p.minStock);
       if (lowStock && lowStock.length > 0) {
-        answer = `درج ذیل مصنوعات کا اسٹاک کم ہے:\n` + lowStock.map((p: any) => `• ${p.name}: ${p.stock} باقی`).join('\n');
+        answer = `The following products are running low on stock:\n` + lowStock.map((p: any) => `• ${p.name}: ${p.stock} remaining`).join('\n');
       } else {
-        answer = `تمام مصنوعات کا اسٹاک مناسب مقدار میں موجود ہے۔`;
+        answer = `Inventory levels look healthy. All fast-moving goods are well stocked.`;
       }
     } else {
-      answer = `اسلام علیکم! میں نے آپ کا لیجر چیک کر لیا ہے۔ تمام ریکارڈز اپ ڈیٹ ہیں۔`;
+      answer = `Hello! I checked your store ledger. All transactions and customer balances are up to date. Let me know if you need specific reports on credit or inventory.`;
     }
 
     try {
@@ -396,7 +382,7 @@ Return JSON object:
 You are VendorVoice AI, the voice assistant for a local shopkeeper.
 Answer the vendor's question using the live store context provided below.
 
-CRITICAL MANDATORY INSTRUCTION: Regardless of whether the vendor asks in ENGLISH or URDU, ALWAYS respond in clear, friendly URDU SCRIPT (اردو زبان) so the vendor reads and hears Urdu.
+CRITICAL MANDATORY INSTRUCTION: ALWAYS respond in clear, professional, friendly ENGLISH.
 
 Live Store Data Context:
 ${JSON.stringify(storeContext, null, 2)}

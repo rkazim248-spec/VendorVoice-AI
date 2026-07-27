@@ -44,8 +44,8 @@ export const OnboardingWalkthrough: React.FC<OnboardingProps> = ({ isOpen, onClo
       color: 'bg-amber-500 text-white',
       image: voiceImg,
       title: t('walkthrough.step2Title', 'Voice-Powered Sales Entry'),
-      subtitle: t('walkthrough.step2Subtitle', 'Urdu Voice Speech Recognition'),
-      description: t('walkthrough.step2Desc', 'Tap the single floating mic button and speak in Urdu (e.g., "Ali ko 2 chawal ke bag 45 rupay mein beche"). The AI parses items, prices, and customer balances automatically.')
+      subtitle: t('walkthrough.step2Subtitle', 'Voice Speech Recognition'),
+      description: t('walkthrough.step2Desc', 'Tap the floating mic button and speak naturally (e.g., "Sold 2 bags of rice to Ali for $10 on credit"). The AI parses items, prices, and customer balances automatically.')
     },
     {
       icon: Users,
